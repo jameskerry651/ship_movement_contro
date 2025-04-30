@@ -46,3 +46,68 @@ Todo...
 | motion_v         | 本船横荡速度（m/s）       | Float    |
 | motion_r         | 本船转艏角速度（°/s）     | Float    |
 | ts_ship_list     | 避碰船列表               | List     |
+
+其中“ts_ship_list”为二维数组，矩阵信息表示为：n行，4列（n为未知数，即避碰船数量未知），每行代表一艘避碰船信息，每列分别代表避碰船的经度、纬度、真航向和对地速度。
+
+## 运动学模型
+$$
+\begin{aligned}
+x_{k+1} &= x_k + \Delta t \cdot (u_k \cos\psi_k - v_k \sin\psi_k) \\
+y_{k+1} &= y_k + \Delta t \cdot (u_k \sin\psi_k + v_k \cos\psi_k) \\
+\psi_{k+1} &= \psi_k + \Delta t \cdot r_k \\
+u_{k+1} &= u_k + \Delta t \cdot (-X_u u_k + X_{u|u|} |u_k|u_k + X_n n_k^2) \\
+v_{k+1} &= v_k + \Delta t \cdot (-Y_v v_k - Y_r r_k + Y_\delta \delta_k) \\
+r_{k+1} &= r_k + \Delta t \cdot (-N_v v_k - N_r r_k + N_\delta \delta_k)
+\end{aligned}
+$$
+
+各项物理含义:
+		$X_u, Y_v, N_r$：线性阻尼项（水动力阻力）
+		$X_{u|u|}$：非线性阻力系数（例如随速度平方增长）
+		$X_n$：推进器输出推力对应转速的增益系数
+		$Y_\delta, N_\delta$：舵角对侧向力/转矩的影响
+
+
+## 状态变量
+$$
+\mathbf{x}_k =
+\begin{bmatrix}
+x_k \\
+y_k \\
+\psi_k \\
+u_k \\
+v_k \\
+r_k
+\end{bmatrix}, \quad
+\mathbf{u}_k =
+\begin{bmatrix}
+\delta_k \\
+n_k
+\end{bmatrix}
+$$
+
+## 状态转移矩阵
+$$
+A = \frac{\partial f}{\partial \mathbf{x}} =
+\begin{bmatrix}
+1 & 0 & -\Delta t(u s + v c) & \Delta t c & -\Delta t s & 0 \\
+0 & 1 & \Delta t(u c - v s) & \Delta t s & \Delta t c & 0 \\
+0 & 0 & 1 & 0 & 0 & \Delta t \\
+0 & 0 & 0 & 1 + \Delta t(-X_u + 2X_{u|u|}|u|) & 0 & 0 \\
+0 & 0 & 0 & 0 & 1 - \Delta t Y_v & -\Delta t Y_r \\
+0 & 0 & 0 & 0 & -\Delta t N_v & 1 - \Delta t N_r
+\end{bmatrix}
+$$
+
+## 控制输入矩阵
+$$
+B = \frac{\partial f}{\partial \mathbf{u}} =
+\begin{bmatrix}
+0 & 0 \\
+0 & 0 \\
+0 & 0 \\
+0 & 2 \Delta t X_n n \\
+\Delta t Y_\delta & 0 \\
+\Delta t N_\delta & 0
+\end{bmatrix}
+$$
