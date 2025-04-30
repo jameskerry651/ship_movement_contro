@@ -36,7 +36,8 @@ def generate_ship_path(pier_positions, left_border_points, right_border_points,
     bridges = identify_bridges(pier_positions)
     
     # Step 2: Generate center path between borders with a right bias
-    center_path = generate_middle_path(left_border_points, right_border_points, num_points)
+    center_path, _i, _j = generate_middle_path(left_border_points, right_border_points, num_points, right_bias=right_bias)
+
     
     # Step 3: Adjust path to avoid bridges
     safe_path = avoid_bridges(center_path, bridges, left_border_points, right_border_points, 
@@ -87,9 +88,9 @@ def distance(p1, p2):
     """Calculate Euclidean distance between two points."""
     return np.linalg.norm(np.array(p1) - np.array(p2))
 
-def generate_middle_path(left_points, right_points, num_points=1000):
+def generate_middle_path(left_points, right_points, num_points=100, right_bias=0.0):
     """
-    Generate middle path points between left and right border points.
+    Generate middle path points between left and right border points with optional right bias.
     
     Parameters:
     -----------
@@ -99,12 +100,20 @@ def generate_middle_path(left_points, right_points, num_points=1000):
         Right border points with shape (m, 2)
     num_points : int
         Number of points to generate for the middle path
+    right_bias : float
+        Bias towards the right border (0.0 to 1.0)
+        0.0 means middle path (no bias)
+        0.5 means 50% towards the right border
+        1.0 means exactly on the right border
         
     Returns:
     --------
     np.array
         Middle path points with shape (num_points, 2)
     """
+    # Ensure right_bias is between 0 and 1
+    right_bias = max(0.0, min(1.0, right_bias))
+    
     # Parameterize the points by their cumulative distance
     def parameterize_by_distance(points):
         dists = np.sqrt(np.sum(np.diff(points, axis=0)**2, axis=1))
@@ -127,8 +136,13 @@ def generate_middle_path(left_points, right_points, num_points=1000):
     left_samples = np.column_stack((fx_left(t_samples), fy_left(t_samples)))
     right_samples = np.column_stack((fx_right(t_samples), fy_right(t_samples)))
     
-    # Middle path is the average of corresponding points
-    middle_path = (left_samples + right_samples) / 2
+    # Calculate weighted average based on right_bias
+    # right_bias = 0.0 -> middle path (50% left, 50% right)
+    # right_bias = 1.0 -> right border (0% left, 100% right)
+    left_weight = 0.5 - right_bias / 2
+    right_weight = 0.5 + right_bias / 2
+    
+    middle_path = left_weight * left_samples + right_weight * right_samples
     
     return middle_path, left_samples, right_samples
 
@@ -257,7 +271,7 @@ def smooth_path(path, iterations=3):
     
     return smoothed
 
-def plot_results(pier_positions, left_border, right_border, path):
+def plot_results(center_ref, pier_positions, left_border, right_border, path):
     """
     Visualize the ship path, channel borders, and bridge positions.
     
@@ -282,12 +296,8 @@ def plot_results(pier_positions, left_border, right_border, path):
     plt.scatter(pier_positions[:, 0], pier_positions[:, 1], color='black', s=20, label='Piers')
     
     # Calculate and plot center line (reference only)
-    center_line = []
-    for i in range(min(len(left_border), len(right_border))):
-        center_x = (left_border[i, 0] + right_border[i, 0]) / 2
-        center_y = (left_border[i, 1] + right_border[i, 1]) / 2
-        center_line.append([center_x, center_y])
-    center_line = np.array(center_line)
+    
+    center_line = np.array(center_ref)
     plt.plot(center_line[:, 0], center_line[:, 1], 'y--', linewidth=1, alpha=0.5, label='Center Reference')
     
     # Plot generated path
@@ -381,7 +391,9 @@ if __name__ == "__main__":
                                   right_bias=right_bias)
     
     # Display the results
-    plot_results(pier_positions, left_border_points, right_border_points, ship_path)
+
+    center_ref, _x, _y = generate_middle_path(left_border_points, right_border_points, num_points=1000, right_bias=right_bias)
+    plot_results(center_ref, pier_positions, left_border_points, right_border_points, ship_path)
         
     # Save the waypoints to a file
     np.savetxt('ship_waypoints_right_biased.csv', ship_path, delimiter=',', header='x,y', comments='')

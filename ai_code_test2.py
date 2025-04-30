@@ -33,6 +33,8 @@ def generate_ship_path(pier_positions, left_border_points, right_border_points,
     
     # Step 2: Generate center path between borders
     center_path = generate_center_path(left_border_points, right_border_points, num_points)
+
+    print(center_path)
     
     # Step 3: Adjust path to avoid bridges
     safe_path = avoid_bridges(center_path, bridges, left_border_points, right_border_points, 
@@ -368,16 +370,7 @@ if __name__ == "__main__":
     # Display the results
     plot_results(pier_positions, left_border_points, right_border_points, ship_path)
     
-    # Print the first and last few waypoints
-    print("First 5 waypoints:")
-    for i in range(min(5, len(ship_path))):
-        print(f"  [{ship_path[i][0]:.2f}, {ship_path[i][1]:.2f}]")
-    
-    print("\nLast 5 waypoints:")
-    for i in range(max(0, len(ship_path)-5), len(ship_path)):
-        print(f"  [{ship_path[i][0]:.2f}, {ship_path[i][1]:.2f}]")
-    
-    print(f"\nTotal number of waypoints: {len(ship_path)}")
+   
     
     # Save the waypoints to a file
     np.savetxt('ship_waypoints.csv', ship_path, delimiter=',', header='x,y', comments='')
